@@ -48,6 +48,9 @@ fn main() -> Result<()> {
     // 6. Setup Prompt
     let prompt = "The impact of artificial";
     println!("\nPrompt: \"{}\"", prompt);
+    // We need to pass `false` here to avoid adding a special token that 
+    // breaks the prompt from the response.  We want the model to continue directly
+    // from the prompt text, not respond to it.
     let encoding = tokenizer.encode(prompt, false).map_err(|e| E::msg(e.to_string()))?;
     let mut tokens = encoding.get_ids().to_vec();
 
@@ -61,19 +64,20 @@ fn main() -> Result<()> {
     
     for i in 0..max_tokens_to_generate {
         let start = Instant::now();
-        // println!("\rGenerating token {}/{}...", i + 1, max_tokens_to_generate);
-        // std::io::stdout().flush()?;
-        
         // Forward pass. No KV cacheing for now.
         let logits = model.forward(&input, pos)?;
-        pos += 1;
                
         // Extract the logits for the very last token in the sequence
         let next_token_logits = logits.squeeze(0)?.get(logits.dim(1)? - 1)?;
         
         // Greedily select the token ID with the highest probability
         let next_token_id = next_token_logits.argmax(0)?.to_scalar::<u32>()?;
+        // We always add one token at a time.
         tokens.push(next_token_id);
+        pos += 1;
+        // Prepare input for the next step: just the generated token.  By default the model
+        // will continue the sequence from the last token, so we don't need to pass the full history.
+        input = Tensor::new(&[next_token_id], &device)?.unsqueeze(0)?;
         
         // Decode and print the new token as soon as it is generated
         if let Ok(text) = tokenizer.decode(&[next_token_id], false) {
@@ -84,8 +88,6 @@ fn main() -> Result<()> {
             std::io::stdout().flush()?;
         }
        
-        // Prepare input for the next step: just the generated token
-        input = Tensor::new(&[next_token_id], &device)?.unsqueeze(0)?;
 
         let duration = start.elapsed();
         last_token_time = duration;
