@@ -5,11 +5,39 @@ use std::sync::{Arc, Mutex};
 
 struct MidiHandler {
     clock_counter: u32,
+    delta_clock_counter: u32,
 }
 
 impl MidiHandler {
     fn new() -> Self {
-        Self { clock_counter: 0 }
+        Self { 
+            clock_counter: 0,
+            delta_clock_counter: 0,
+        }
+    }
+
+    fn increment_clock(&mut self) {
+        self.clock_counter += 1;
+        self.delta_clock_counter += 1;
+        if self.clock_counter >= 24 {
+            print!("Q ");
+            let _ = stdout().flush();
+            self.clock_counter = 0;
+            self.delta_clock_counter = 0;
+        }
+    }
+
+    fn reset_clock(&mut self) {
+        self.clock_counter = 0;
+        self.delta_clock_counter = 0;
+    }
+
+    fn print_delta_time(&mut self) {
+        if self.delta_clock_counter > 0 {
+            print!("P{:02x} ", self.delta_clock_counter);
+            let _ = stdout().flush();
+            self.delta_clock_counter = 0;
+        }
     }
 
     fn handle_message(&mut self, message: &[u8]) {
@@ -22,33 +50,33 @@ impl MidiHandler {
             // Juno 106 sends these when all keys are lifted.
             return; // Ignore Control Change messages.
         } else if message.len() == 1 && message[0] == 0xf8 {
-            self.clock_counter += 1;
-            if self.clock_counter >= 24 {
-                print!("Q ");
-                let _ = stdout().flush();
-                self.clock_counter = 0;
-            }
-        } else if message[0] & 0xf0 == 0xf0 {
-            return; // Ignore other system real-time messages (Active Sensing, etc).
+            self.increment_clock();
         }
-        // Interesting things start here        
         else if message.len() == 1 && message[0] == 0xfa {
             // Start of a sequence - reset clock counter.
-            self.clock_counter = 0;
-            print!("S ");
+            self.reset_clock();
+            print!("Start ");
             let _ = stdout().flush();
+        } else if message.len() == 1 && message[0] == 0xfc {
+            // End of sequence.
+            print!("End ");
+            let _ = stdout().flush();
+        } else if message[0] & 0xf0 == 0xf0 {
+            return; // Ignore other system real-time messages (Active Sensing, etc).
         } else if message.len() == 3 && 
             (message[0] & 0xf0 == 0x90 && message[2] == 0) || 
             (message.len() == 3 && message[0] & 0xf0 == 0x80) {
           // Note off message (Note on with velocity 0) - print the note number.
+          self.print_delta_time();
           print!("O{:02x} ", message[1]);
           let _ = stdout().flush();
         } else if message.len() == 3 && message[0] & 0xf0 == 0x90 {
             // Note on message - print the note number and velocity.
+            self.print_delta_time();
             print!("N{:02x} v{:02x} ", message[1], message[2]);
             let _ = stdout().flush();
         } else {
-
+            print!("M");
             for byte in message {
                 print!("{:02x}", byte);
             }
