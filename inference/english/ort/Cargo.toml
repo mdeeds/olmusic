@@ -1,0 +1,17 @@
+[package]
+name = "ort_inference"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ort_inference"
+path = "src/main.rs"
+
+[dependencies]
+hf-hub = "0.4.1"
+tokenizers = "0.21.0"
+anyhow = "1.0"
+ndarray = "0.15"
+
+# ort with DirectML support for Windows/AMD
+ort = { version = "2.0.0-rc.2", features = ["directml"] }
