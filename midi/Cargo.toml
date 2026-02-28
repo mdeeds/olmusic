@@ -1,3 +1,12 @@
+[package]
+name = "midi_transcription"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "midi_transcription"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0"
 midir = "0.9"
